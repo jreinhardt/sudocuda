@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include <curand.h>
 
-//TODO: find out why BLK_SIZE 4 does not work
+//this must be smaller than 16 (but is realisticly 3 or 4 or maybe 5)
 #define BLK_SIZE 3
 #define SUD_SIZE (BLK_SIZE*BLK_SIZE)
 
@@ -31,7 +31,7 @@ typedef struct{
 	char hnt_blk[SUD_SIZE*SUD_SIZE];
 
 	//Number of unknowns
-	char n_unk;
+	unsigned int n_unk;
 } sudoku_const_t;
 
 typedef struct {
@@ -51,7 +51,7 @@ __constant__ sudoku_const_t con[1];
 __constant__ int lut_exp[256];
 
 //each int is good for four unknowns, so n_ints should be sufficiently large
-__global__ void init(sudoku_t *suds, unsigned int* random, unsigned int* energies, unsigned n_ints){
+__global__ void init(sudoku_t *suds, unsigned int* energies, unsigned int* random, unsigned n_ints){
 	int thread_idx = blockIdx.x*blockDim.x + threadIdx.x;
 	int i,sym;
 
