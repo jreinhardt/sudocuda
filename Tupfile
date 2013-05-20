@@ -1,1 +1,1 @@
-: foreach *.cu |> nvcc -g -O3 -arch compute_30 --generate-line-info -o %o %f -lcurand|> %B
+: foreach *.cu |> nvcc -O3 -o %o %f -lcurand|> %B
