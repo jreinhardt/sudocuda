@@ -224,26 +224,26 @@ void hint16(sudoku_const_t* sud){
 	}
 }
 
-void energy_stats(unsigned int *energies, unsigned int n_threads){
-	int max_energy=0, min_energy=1e10, total_energy;
+void energy_stats(int round, unsigned int *energies, unsigned int n_threads){
+	int max_energy=0, min_energy=100000, total_energy;
 	int i;
 	for(i=0;i<n_threads;i++){
 		max_energy = (energies[i] > max_energy) ? energies[i] : max_energy;
 		min_energy = (energies[i] < min_energy) ? energies[i] : min_energy;
 		total_energy += energies[i];
 	}
-	printf("Mean: %f Min: %d Max: %d\n",float(total_energy)/n_threads, min_energy, max_energy);
+	printf("Round: %d Mean: %f Min: %d Max: %d\n",round,float(total_energy)/n_threads, min_energy, max_energy);
 }
 
 #define THREADS_PER_BLOCK 256
-#define NUM_BLOCKS 16
+#define NUM_BLOCKS 4
 
 int main(){
 	int i,j;
 	int n_ints;
 
 	sudoku_const_t h_sudoku_const[1];
-	sudoku_t *d_sudoku, h_sudoku;
+	sudoku_t *d_sudoku;
 
 	int h_lut_exp[256];
 	unsigned int *d_random;
@@ -262,17 +262,12 @@ int main(){
 	cudaMemcpyToSymbol(con,h_sudoku_const,sizeof(sudoku_const_t));
 	n_ints = 1 + h_sudoku_const->n_unk/4;
 	printf("Unknowns: %d n_ints: %d\n",h_sudoku_const->n_unk,n_ints);
-//	printf("Hint counts: \n");
-//	for(i=0;i<SUD_SIZE;i++){
-//		printf("%d ",h_sudoku_const->hnt_row[i]);
-//	}
-//	printf("\n");
 
 	//set up random number generator
 	curandGenerator_t gen;
 	curandCreateGenerator(&gen,CURAND_RNG_PSEUDO_DEFAULT);
 	curandSetPseudoRandomGeneratorSeed(gen,12345ULL);
-	cudaMalloc(&d_random,n_ints*sizeof(unsigned int)*n_threads);
+	cudaMalloc(&d_random,n_threads*n_ints*sizeof(unsigned int));
 
 	//set up exp(delta_E/T) lut
 	//256 is a safe upper bound for SUD_SIZE 9 and we clamp delta E for
@@ -287,41 +282,18 @@ int main(){
 	h_energies = (unsigned int*) malloc(n_threads*sizeof(unsigned int));
 	cudaMalloc(&d_energies,n_threads*sizeof(unsigned int));
 
-	//setup variable sudoku description
+	//setup and initialize variable sudoku description
 	cudaMalloc(&d_sudoku,n_threads*sizeof(sudoku_t));
 	curandGenerate(gen,d_random,n_ints*n_threads);
 	init<<<num_blocks,threads_per_block>>>(d_sudoku,d_energies,d_random,n_ints);
 
-	//test whether that worked
-	cudaMemcpy(&h_sudoku,d_sudoku,sizeof(sudoku_t),cudaMemcpyDeviceToHost);
-	cudaMemcpy(h_energies,d_energies,n_threads*sizeof(unsigned int),cudaMemcpyDeviceToHost);
-//	energy_stats(h_energies,n_threads);
-	cudaMemcpy(&h_sudoku,d_sudoku,sizeof(sudoku_t),cudaMemcpyDeviceToHost);
-	for(i=0;i<h_sudoku_const->n_unk;i++){
-		printf("%d ",h_sudoku.unk_val[i]);
-	}
-	printf("Energy: %d\n",h_sudoku.energy);
-	printf("Row counts:\n");
-	for(i=0;i<SUD_SIZE;i++){
-		for(j=0;j<SUD_SIZE;j++){
-			printf("%d ",h_sudoku.cnt_row[i*SUD_SIZE + j]);
-		}
-		printf("\n");
-	}
-
-	for(j=0;j<50;j++){
+	for(j=0;j<500;j++){
 		curandGenerate(gen,d_random,n_ints*n_threads);
 		round<<<num_blocks,threads_per_block>>>(d_sudoku,d_energies,d_random,n_ints);
 
-		//test whether that worked
-		cudaMemcpy(&h_sudoku,d_sudoku,sizeof(sudoku_t),cudaMemcpyDeviceToHost);
+		//check energies
 		cudaMemcpy(h_energies,d_energies,n_threads*sizeof(unsigned int),cudaMemcpyDeviceToHost);
-		energy_stats(h_energies,n_threads);
-//		cudaMemcpy(&h_sudoku,d_sudoku,sizeof(sudoku_t),cudaMemcpyDeviceToHost);
-//		for(i=0;i<h_sudoku_const->n_unk;i++){
-//			printf("%d ",h_sudoku.unk_val[i]);
-//		}
-//		printf("Energy: %d\n",h_sudoku.energy);
+		energy_stats(j,h_energies,n_threads);
 	}
 
 	cudaFree(d_random);
