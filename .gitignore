@@ -1,2 +1,3 @@
 .tup
-mcsudoku
+mcsudoku_cpu
+mcsudoku_gpu
