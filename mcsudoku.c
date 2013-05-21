@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <math.h>
+#include <time.h>
 
 //this must be smaller than 16 (but is realisticly 3 or 4 or maybe 5)
 #define BLK_SIZE 3
 #define SUD_SIZE (BLK_SIZE*BLK_SIZE)
 #define ENSEMBLE_SIZE (256*16)
+#define N_ROUNDS 100
 
 
 //to describe the sudoku in a form that is suitable for fast access, we split
@@ -109,7 +111,6 @@ void mc_round(sudoku_t *suds, unsigned int* energies, unsigned int n_ints){
 		for(steps=0;steps<n_ints;steps++){
 			//dissect the random number
 			random = rand();
-			sud->unk_val[i] = (random >> (8*(i%4))) % SUD_SIZE;
 			idx = (random >> 0) % con->n_unk;
 			val = (random >> 8) % SUD_SIZE;
 			rnd = (random >> 16);
@@ -236,19 +237,22 @@ void hint16(sudoku_const_t* sud){
 }
 
 void energy_stats(int round, unsigned int *energies, unsigned int n_threads){
-	int max_energy=0, min_energy=100000, total_energy;
+	int max_energy=0, min_energy=100000;
+	float total_energy=0;
 	int i;
 	for(i=0;i<n_threads;i++){
 		max_energy = (energies[i] > max_energy) ? energies[i] : max_energy;
 		min_energy = (energies[i] < min_energy) ? energies[i] : min_energy;
 		total_energy += energies[i];
 	}
-	printf("Round: %d Mean: %f Min: %d Max: %d\n",round,(total_energy+0.)/n_threads, min_energy, max_energy);
+	printf("Round: %d Mean: %f Min: %d Max: %d\n",round,total_energy/n_threads, min_energy, max_energy);
 }
 
 int main(){
 	int i,j;
 	int n_ints;
+	long int n_steps;
+	float time;
 
 	sudoku_t sudoku[ENSEMBLE_SIZE];
 
@@ -276,15 +280,19 @@ int main(){
 		lut_exp[i] = exp(-i/temp)*(1<<16);
 	}
 
+	time = clock();
 	//setup and initialize variable sudoku description
 	init(sudoku,energies,n_ints);
 
-	for(j=0;j<500;j++){
+	for(j=0;j<N_ROUNDS;j++){
 		mc_round(sudoku,energies,n_ints);
 
 		//check energies
 		energy_stats(j,energies,ENSEMBLE_SIZE);
 	}
+	time = (clock() - time)/CLOCKS_PER_SEC;
+	n_steps = n_ints*ENSEMBLE_SIZE*N_ROUNDS;
+	printf("Steps: %ld, Time: %f s, %.1f Steps/s\n",n_steps,time,n_steps/time);
 }
 
 

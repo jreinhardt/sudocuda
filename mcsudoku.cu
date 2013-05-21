@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <math.h>
+#include <time.h>
 // CUDA runtime
 #include <cuda_runtime.h>
 #include <curand.h>
@@ -8,6 +9,9 @@
 //this must be smaller than 16 (but is realisticly 3 or 4 or maybe 5)
 #define BLK_SIZE 3
 #define SUD_SIZE (BLK_SIZE*BLK_SIZE)
+#define THREADS_PER_BLOCK 256
+#define NUM_BLOCKS 16
+#define N_ROUNDS 100
 
 //to describe the sudoku in a form that is suitable for fast access, we split
 //it in two parts: One part describes the constant structure, i.e. the
@@ -235,12 +239,11 @@ void energy_stats(int round, unsigned int *energies, unsigned int n_threads){
 	printf("Round: %d Mean: %f Min: %d Max: %d\n",round,float(total_energy)/n_threads, min_energy, max_energy);
 }
 
-#define THREADS_PER_BLOCK 256
-#define NUM_BLOCKS 4
-
 int main(){
 	int i,j;
 	int n_ints;
+	long int n_steps;
+	float time;
 
 	sudoku_const_t h_sudoku_const[1];
 	sudoku_t *d_sudoku;
@@ -282,12 +285,14 @@ int main(){
 	h_energies = (unsigned int*) malloc(n_threads*sizeof(unsigned int));
 	cudaMalloc(&d_energies,n_threads*sizeof(unsigned int));
 
+	time = clock();
+
 	//setup and initialize variable sudoku description
 	cudaMalloc(&d_sudoku,n_threads*sizeof(sudoku_t));
 	curandGenerate(gen,d_random,n_ints*n_threads);
 	init<<<num_blocks,threads_per_block>>>(d_sudoku,d_energies,d_random,n_ints);
 
-	for(j=0;j<500;j++){
+	for(j=0;j<N_ROUNDS;j++){
 		curandGenerate(gen,d_random,n_ints*n_threads);
 		round<<<num_blocks,threads_per_block>>>(d_sudoku,d_energies,d_random,n_ints);
 
@@ -295,6 +300,9 @@ int main(){
 		cudaMemcpy(h_energies,d_energies,n_threads*sizeof(unsigned int),cudaMemcpyDeviceToHost);
 		energy_stats(j,h_energies,n_threads);
 	}
+	time = (clock() - time)/CLOCKS_PER_SEC;
+	n_steps = n_ints*n_threads*N_ROUNDS;
+	printf("Steps: %ld, Time: %f s, %.1f Steps/s\n",n_steps,time,n_steps/time);
 
 	cudaFree(d_random);
 	curandDestroyGenerator(gen);
