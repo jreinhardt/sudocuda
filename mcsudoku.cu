@@ -1,8 +1,34 @@
+/* The MIT License (MIT)
+ *
+ * Copyright (c) 2013 Johannes Reinhardt <jreinhardt@ist-dein-freund.de>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ */
+
+/* Monte Carlo Sudoku solver in CUDA */
+
+
 #include <stdio.h>
 #include <malloc.h>
 #include <math.h>
 #include <time.h>
-// CUDA runtime
 #include <cuda_runtime.h>
 
 //this must be smaller than 16 (but is realisticly 3 or 4 or maybe 5)
@@ -462,7 +488,7 @@ int main(){
 	//set up sudoku description
 	if(SUD_SIZE==9){
 		sudoku_alloc_host(&h_sudoku,h_lut_exp,81);
-		hint1(&h_sudoku);
+		empty(&h_sudoku);
 	} else {
 		sudoku_alloc_host(&h_sudoku, h_lut_exp, 165);
 		hint16(&h_sudoku);
@@ -474,7 +500,7 @@ int main(){
 	//GPU Run
 	time = clock();
 
-	for(j=0;j<N_STEPS;j++){
+	for(j=0;j<15000;j++){
 		step_gpu<<<num_blocks,threads_per_block>>>(d_sudoku,d_lut_exp);
 		gpuErrchk(cudaMemcpy(energies,d_sudoku.energy,N_THREADS*sizeof(unsigned int),cudaMemcpyDeviceToHost));
 		energy_stats(j,energies,N_THREADS);
